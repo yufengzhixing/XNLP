@@ -1,0 +1,462 @@
+package com.dyx.nlp.reasoning;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+public class HumanRelation {
+	private Set  relationFact=new HashSet();//关系事实集
+	private Map<String,String> sexMap=new LinkedHashMap<String,String>();//性别事实集
+	private Map<String,String> ageMap=new LinkedHashMap<String,String>();//年龄事实集
+	public  static void main(String []args) {
+		HumanRelation a=new HumanRelation();
+//		String [] senList =new String [];
+		String [] s1= {"小明是小红的丈夫",
+				"张三是小红的父亲",
+				"王丽是张三的妻子",
+				"小小明是小明的儿子",
+				"老张是张三的父亲"};
+		for (int i=0;i<s1.length;i++) {
+			System.out.println("Konwn:"+s1[i]);
+			String [] triArr=a.toTriArr(s1[i]);
+			String [] result1=a.getEqualRealtion(triArr);
+			String [] sex1=a.getSex(triArr);
+			String [] sex2=a.getSex(result1);
+			String [] age1=a.getOlderJunior(triArr);
+			String [] age2=a.getOlderJunior(result1);
+			System.out.println("=>:"+a.relaitonToSen(result1));
+			System.out.println("=>:"+a.ageToSen(age1));
+			System.out.println("=>:"+a.ageToSen(age2));
+			System.out.println("=>:"+a.sexToSen(sex1));
+			System.out.println("=>:"+a.sexToSen(sex2));
+		}
+		
+		for (int i=0;i<s1.length-1;i++) {
+			for(int j=i+1;j<s1.length;j++) {
+				String ss1=s1[i];
+				String ss2=s1[j];
+				String [] ss1Arr=a.toTriArr(ss1);
+				String [] ss2Arr=a.toTriArr(ss2);
+				String [] result2=a.getInferenceRealtion(ss1Arr,ss2Arr);
+				if (result2[2].equals("null")) {
+					System.out.print(".");
+				}else {
+					System.out.println(ss1+"\t"+ss2+"==>:"+a.relaitonToSen(result2));
+				}				
+			}
+		}		
+	}
+	/**
+	 * 一阶谓语句子==>三元组
+	 * @param sen
+	 * @return
+	 */
+	public  String [] toTriArr(String sen) {		
+		String entity1="null";
+		String entity2="null";
+		String relation="null";
+		String regEx= "(?<entity1>.*)是(?<entity2>.*)的(?<relation>.*)";
+		Pattern p = Pattern.compile(regEx);
+		Matcher m = p.matcher(sen);
+		if (m.find()) {
+			 entity1=m.group("entity1");
+			 entity2=m.group("entity2");
+			 relation=m.group("relation");
+		}		
+		String [] triArr=new String [3];
+		triArr[0]=entity1;			
+		triArr[1]=entity2;
+		triArr[2]=relation;
+		this.relationFact.add(triArr);
+		return triArr;		
+	}
+	/**
+	 * 关系三元组==>一阶谓词句子
+	 * @param triArr
+	 * @return
+	 */
+	public static String relaitonToSen(String [] triArr) {
+		String sen="null";
+		String entity1="null";
+		sen=triArr[0]+"是"+triArr[1]+"的"+triArr[2];
+		return sen;		
+	}
+	/**
+	 * 性别三元组==>一阶谓词句子
+	 * @param triArr
+	 * @return
+	 */
+	public  String sexToSen(String [] triArr) {
+		String sen="null";
+		String entity1="null";
+		sen=triArr[0]+"的"+triArr[2]+"是"+triArr[1];
+		return sen;		
+	}
+	/**
+	 * 实体年龄关系转为句子
+	 * @param triArr
+	 * @return
+	 */
+	public  String ageToSen(String [] triArr) {
+		String sen="null";
+		String entity1="null";
+		sen=triArr[0]+"比"+triArr[1]+triArr[2];
+		return sen;		
+	}
+	/**
+	 * 一阶谓词句子=>新的一阶谓词句子
+	 * @param triArr
+	 * @return
+	 */
+	public  String [] getEqualRealtion(String [] triArr) {
+		this.relationFact.add(triArr);
+		String a=triArr[0];
+		String b=triArr[1];
+		String r=triArr[2];		
+		String newR=null;
+		String[] relations=null;
+		String [] newtriArr=new String [3];
+		String[] strlist=null;
+		String[] rules = {"丈夫，妻子",
+				"妻子，丈夫",
+				"哥哥，弟弟/妹妹",
+				"弟弟，哥哥/姐姐",
+				"姐姐，弟弟/妹妹",
+				"妹妹，哥哥/姐姐",
+				"表哥，表弟/表妹",
+				"表弟，表哥/表姐",
+				"表姐，表弟/表妹",
+				"表妹，表哥/表姐",
+				"堂哥，堂弟/堂妹",
+				"堂弟，堂哥/堂姐",
+				"堂姐，堂弟/堂妹",
+				"堂妹，堂哥/堂姐",
+				"父亲，儿子/女儿",
+				"母亲，儿子/女儿",
+				"叔叔，侄子/侄女",
+				"婶婶，侄子/侄女",
+				"伯父，侄子/侄女",
+				"伯母，侄子/侄女",
+				"舅舅，外甥/外甥女",
+				"舅妈，外甥/外甥女",
+				"姑父，侄子/侄女",
+				"姑妈，侄子/侄女",
+				"爷爷，孙子/孙女",
+				"奶奶，孙子/孙女",
+				"姥爷，外孙子/外孙女",
+				"姥姥，外孙子/外孙女",
+				"儿子，父亲/母亲",
+				"女儿，父亲/母亲",
+				"孙子，爷爷/奶奶",
+				"孙女，爷爷/奶奶"};
+		for(int i=0;i<rules.length;i++){
+			strlist = rules[i].split("，");
+			if (r.equals(strlist[0])) {
+				newR=strlist[1];
+				newtriArr[0]=b;			
+				newtriArr[1]=a;
+				newtriArr[2]=newR;
+				relations=newR.split("/");
+				if (strlist.length==2 && this.sexMap.containsKey(b)) {//根据已有知识确定真正的身份
+					if (this.sexMap.get(b).equals("男")) {
+						newtriArr[2]=relations[0];
+					}else newtriArr[2]=relations[1];
+				}else newtriArr[2]=newR;
+				break;
+				}
+			}
+		this.relationFact.add(newtriArr);
+		System.out.println("字典大小"+this.relationFact.size());
+		return newtriArr;		
+	}
+	/**
+	 * 得到性别三元组
+	 * @param triArr
+	 * @return
+	 */
+	public  String [] getSex(String [] triArr) {
+		String r=triArr[2];
+		String entitySex="unknown";
+		String [] newtriArr=new String [3];
+		String[] maleTypes = new String[]{
+				"丈夫",
+				"哥哥",
+				"弟弟",
+				"堂哥",
+				"堂弟",
+				"表哥",
+				"表弟",
+				"父亲",
+				"公公",
+				"岳父",
+				"伯父",
+				"叔叔",
+				"舅舅",
+				"姨父",
+				"姑父",
+				"爷爷",
+				"姥爷",
+				"儿子",
+				"女婿",
+				"侄子",
+				"外甥",
+				"孙子",				
+				"外孙"
+				};		
+		String[] femaleTypes = new String[]{
+				"妻子",
+				"姐姐",
+				"妹妹",
+				"堂姐",
+				"堂妹",
+				"表姐",
+				"表妹",
+				"母亲",
+				"婆婆",
+				"岳母",
+				"伯母",
+				"婶婶",
+				"舅妈",
+				"姨妈",
+				"姑妈",
+				"奶奶",
+				"姥姥",
+				"女儿",
+				"儿媳",
+				"侄女",
+				"外甥女",
+				"孙女",
+				"孙媳",
+				"外孙女"};
+		int lenMT=maleTypes.length;
+		int lenFT=femaleTypes.length;
+		String attribute="性别";
+		for (int i=0;i<lenMT;i++) {
+			if (r.equals(maleTypes[i])) {
+				entitySex="男";
+				break;
+			}
+		}
+		if (entitySex.equals("unknown")) {
+			for (int i=0;i<lenFT;i++) {
+				if (r.equals(femaleTypes[i])) {
+					entitySex="女";
+					break;
+				}
+			}
+		}
+		newtriArr[0]=triArr[0];
+		newtriArr[1]=entitySex;
+		newtriArr[2]=attribute;
+		if(!this.sexMap.containsKey(triArr[0])&& !entitySex.equals("unknown")) {
+			this.sexMap.put(triArr[0], entitySex);			
+		}
+		return newtriArr;
+	}
+	/**
+	 * A和B的关系，C和A的关系=>C和B的关系
+	 * @param triArr1
+	 * @param triArr2
+	 * @return
+	 */
+	public  String [] getInferenceRealtion(String [] triArr1,String [] triArr2) {
+		String [] newtriArr=new String [3];
+		String a1=triArr1[0];
+		String b1=triArr1[1];
+		String r1=triArr1[2];
+		String a2=triArr2[0];
+		String b2=triArr2[1];
+		String r2=triArr2[2];
+		String a3="null";
+		String b3="null";
+		String r3="null";
+		String[] relations=null;
+		String[] strlist=null;
+		String[] rules = {"父亲，妻子，母亲",
+				"父亲，儿子，哥哥/弟弟/本人",				
+				"父亲，女儿，姐姐/妹妹/本人",
+				"父亲，父亲，爷爷",
+				"父亲，母亲，奶奶",
+				"父亲，岳父，姥爷",
+				"父亲，岳母，姥姥",
+				"父亲，哥哥，伯父",
+				"父亲，弟弟，叔叔",
+				"父亲，嫂子，伯母",
+				"父亲，弟媳，婶婶",
+				"母亲，丈夫，父亲",
+				"母亲，女儿，姐姐/妹妹/本人",
+				"母亲，儿子，哥哥/弟弟/本人",
+				"母亲，母亲，姥姥",
+				"母亲，父亲，姥爷",
+				"母亲，公公，爷爷",
+				"母亲，婆婆，奶奶",
+				"母亲，哥哥，舅舅",
+				"母亲，弟弟，舅舅",
+				"母亲，嫂子，舅妈",
+				"母亲，弟媳，舅妈",				
+				"丈夫，妻子，本人",
+				"丈夫，父亲，公公",
+				"丈夫，母亲，婆婆",
+				"丈夫，儿子，儿子",
+				"丈夫，女儿，女儿",
+				"妻子，丈夫，本人",				
+				"妻子，儿子，儿子",				
+				"妻子，女儿，女儿",
+				"儿子，母亲，妻子/本人",
+				"女儿，母亲，妻子/本人",
+				"儿子，父亲，丈夫/本人",
+				"女儿，父亲，丈夫/本人",
+				"儿子，哥哥，儿子",
+				"儿子，弟弟，儿子",
+				"女儿，哥哥，儿子",
+				"女儿，弟弟，儿子",
+				"儿子，姐姐，女儿",
+				"儿子，妹妹，女儿",
+				"女儿，姐姐，女儿",
+				"女儿，妹妹，女儿",
+				"哥哥，父亲，父亲",
+				"弟弟，父亲，父亲",
+				"姐姐，父亲，父亲",
+				"妹妹，父亲，父亲",
+				"哥哥，母亲，母亲",
+				"弟弟，母亲，母亲",
+				"姐姐，母亲，母亲",
+				"姐姐，母亲，母亲",
+				"哥哥，哥哥，哥哥",
+				"哥哥，姐姐，姐姐",
+				"姐姐，哥哥，哥哥",
+				"姐姐，姐姐，姐姐",
+				"弟弟，弟弟，弟弟",
+				"弟弟，妹妹，妹妹",
+				"妹妹，弟弟，弟弟",
+				"妹妹，妹妹，妹妹",
+				"哥哥，弟弟，哥哥/弟弟/本人",
+				"哥哥，妹妹，姐姐/妹妹/本人",
+				"姐姐，弟弟，哥哥/弟弟/本人",
+				"姐姐，妹妹，姐姐/妹妹/本人",
+				"弟弟，哥哥，哥哥/弟弟/本人",
+				"弟弟，姐姐，姐姐/妹妹/本人",
+				"妹妹，哥哥，哥哥/弟弟/本人",
+				"妹妹，姐姐，姐姐/妹妹/本人"};
+		if (a1.equals(b2)){
+			for(int i=0;i<rules.length;i++){
+				strlist = rules[i].split("，");
+				if (r1.equals(strlist[0])&&r2.equals(strlist[1])){
+					a3=a2;
+					b3=b1;
+					r3=strlist[2];
+					relations=r3.split("/");
+					if (strlist.length==2 && this.sexMap.containsKey(a3)) {
+						if (this.sexMap.get(a3).equals("男")) {
+							r3=strlist[0];
+						}else r3=strlist[1];
+					}
+					break;
+					}
+				}
+		}		
+		newtriArr[0]=a3;
+		newtriArr[1]=b3;
+		newtriArr[2]=r3;
+		this.relationFact.add(newtriArr);
+		return newtriArr;
+	}
+	/**
+	 * 推理句子的人物性别确定
+	 * @param sexArr
+	 * @param cddtArr
+	 * @return
+	 */
+	public  String [] sexDetermination(String [] cddtArr) {
+		String [] newtriArr=cddtArr;
+		String sex=null;
+//		ArrayList sexFact =new ArrayList();
+		String a=cddtArr[0];
+		String relations=cddtArr[2];
+		String[] strlist=relations.split("/");
+		if (strlist.length==2 && this.sexMap.containsKey(a)) {
+			sex= this.sexMap.get(a);
+			if (sex.equals("男")) {
+				newtriArr[2]=strlist[0];
+			}else newtriArr[2]=strlist[1];
+		}	
+		return newtriArr;	
+	}
+	/**
+	 * 返回年龄比较结果
+	 * @param triArr
+	 * @return
+	 */
+	public  String [] getOlderJunior(String [] triArr) {
+		String [] newtriArr=new String [3];
+		newtriArr[2]="unknown";
+		String[] elders = new String[]{
+				"哥哥",
+				"姐姐",
+				"表哥",
+				"表姐",
+				"堂哥",
+				"堂姐",
+				"父亲",
+				"母亲",
+				"叔叔",
+				"婶婶",
+				"伯父",
+				"伯母",
+				"岳父",
+				"岳母",
+				"姑妈",
+				"姑父",
+				"舅舅",
+				"舅妈",
+				"姨妈",
+				"姨父",
+				"爷爷",
+				"奶奶",
+				"姥姥",
+				"姥爷"
+				};
+		String[] juniors = new String[]{
+				"弟弟",
+				"弟媳",
+				"妹妹",
+				"妹夫",
+				"表弟",
+				"表妹",
+				"堂弟",
+				"堂妹",
+				"儿子",
+				"儿媳",
+				"女儿",
+				"女婿",
+				"侄子",
+				"侄女",				
+				"外甥",
+				"外甥女",
+				"孙子",
+				"孙媳",
+				"孙女",
+				"孙女婿",
+				};
+		int lenElders=elders.length;
+		int lenJuniors=juniors.length;
+		for (int i=0;i<lenElders;i++) {
+			if (triArr[2].equals(elders[i])) {
+				newtriArr[2]="大";
+				break;
+			}
+		}
+		for (int i=0;i<lenJuniors;i++) {
+			if (triArr[2].equals(juniors[i])) {
+				newtriArr[2]="小";
+				break;
+			}
+		}
+		newtriArr[0]=triArr[0];
+		newtriArr[1]=triArr[1];
+		return newtriArr;			
+	}
+}
